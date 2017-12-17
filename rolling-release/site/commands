@@ -1,0 +1,8 @@
+
+ansible all -m ping -i inventory
+
+ansible-playbook infrastructure-deploy.yml -i inventory --extra-vars="deploy_v=1.0.0"
+
+ansible-playbook rolling-upgrades.yml -i inventory --extra-vars="deploy_v=1.1.0"
+
+

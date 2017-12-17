@@ -1,0 +1,63 @@
+---
+- hosts: appservers
+  become: true
+  serial: 1
+  pre_tasks:
+    - name: disable app server in nginx-lb
+      shell: sed -i "s/{{ ansible_host }}:3000;/{{ ansible_host }}:3000 down;/" /etc/nginx/sites-available/default
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.loadbalancers }}"
+    - name: rerolad nginx-lb
+      service:
+        name: nginx
+        state: reloaded
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.loadbalancers }}"
+      
+  tasks:
+    - name: ensure "git" present
+      apt:
+        name: git
+        state: present
+    - name: ensure "nodeservice" stopped
+      service:
+        name: nodeserver
+        state: stopped        
+    - name: clonning node.js app  
+      git: 
+        repo: 'https://bitbucket.org/ZaRDaK/devops-rolling-release.git'
+        dest: /srv/app
+        version: "v{{ deploy_v }}"
+        accept_hostkey: yes
+    - name: ensure "npm" "python" present
+      apt: 
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - npm
+        - python
+    - name: Fetch dependencies nodejs app (package.json)
+      npm:
+        path: /srv/app
+    - name: ensure "nodeservice" started
+      service:
+        name: nodeserver
+        state: started
+        enabled: yes
+    - name: check nodejs app service working
+      wait_for:
+        port: 3000
+        connect_timeout: 1
+        timeout: 10
+
+  post_tasks:
+    - name: enable app server in nginx-lb
+      shell: sed -i "s/{{ ansible_host }}:3000 down;/{{ ansible_host }}:3000;/" /etc/nginx/sites-available/default
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.loadbalancers }}"
+    - name: rerolad nginx-lb
+      service:
+        name: nginx
+        state: reloaded
+      delegate_to: "{{ item }}"
+      with_items: "{{ groups.loadbalancers }}"

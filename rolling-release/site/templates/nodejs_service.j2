@@ -1,0 +1,15 @@
+[Unit]
+Description=Nodejs App Server
+After=network.target
+
+[Service]
+WorkingDirectory=/srv/app
+ExecStart=/usr/bin/node /srv/app/index.js
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=nodejs-app
+User=vagrant
+Environment=APP_KEY={{ ansible_hostname }} APP_PORT=3000 NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

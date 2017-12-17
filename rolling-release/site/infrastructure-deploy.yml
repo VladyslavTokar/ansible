@@ -1,0 +1,69 @@
+---
+- hosts: loadbalancers
+  become: true
+  tasks:
+    - name: ensure "nginx" present
+      apt:
+        name: nginx
+        state: present
+    - name:  ensure "nginx" started
+      service: 
+       name: nginx
+       state: started
+       enabled: yes        
+    - name: ensure "nginx" configured as loadbalancer
+      template:
+        src: templates/nginx-lb.j2
+        dest: /etc/nginx/sites-available/default
+        owner: root
+        group: root
+        mode: 0644
+    - name: rerolad nginx-lb
+      service:
+        name: nginx
+        state: reloaded
+
+- hosts: appservers
+  become: true
+  tasks:
+    - name: ensure "git" present
+      apt:
+        name: git
+        state: present
+    - name: clonning node.js app  
+      git: 
+        repo: 'https://bitbucket.org/ZaRDaK/devops-rolling-release.git'
+        dest: /srv/app
+        version: "v{{ deploy_v }}"
+        accept_hostkey: yes
+    - name: ensure "apt-transport-https" present
+      apt: 
+        name: apt-transport-https
+        state: present
+    - name: ensure "apt key for nodesource" added
+      apt_key: 
+        url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
+    - name: ensure "NodeSource deb repository" added
+      apt_repository:
+        repo: 'deb https://deb.nodesource.com/node_8.x {{ ansible_distribution_release }} main' 
+        update_cache: yes
+    - name: ensure "nodejs" "npm" "python" present
+      apt: 
+        name: "{{ item }}" 
+        state: present
+      with_items:
+        - nodejs
+        - npm
+        - python
+    - name: Fetch dependencies nodejs app
+      npm:
+        path: /srv/app
+    - name: ensure "nodejs app service" created   
+      template:
+        src: templates/nodejs_service.j2
+        dest: /etc/systemd/system/nodeserver.service
+    - name: ensure "nodeservice" started
+      service:
+        name: nodeserver
+        state: started
+        enabled: yes
